@@ -1,0 +1,45 @@
+{
+  "timestamp": "20260224_163033",
+  "algorithm": "DFS",
+  "results": [
+    {
+      "test_name": "Easy",
+      "algorithm": "DFS",
+      "grid_size": 8,
+      "total_cells": 64,
+      "total_words": 10,
+      "total_chars": 39,
+      "found_words": 10,
+      "time_seconds": 0.0008380413055419922,
+      "memory_mb": 0.0,
+      "nodes_explored": 135,
+      "success_rate": 100.0
+    },
+    {
+      "test_name": "Medium",
+      "algorithm": "DFS",
+      "grid_size": 10,
+      "total_cells": 100,
+      "total_words": 16,
+      "total_chars": 85,
+      "found_words": 16,
+      "time_seconds": 0.0027353763580322266,
+      "memory_mb": 0.0,
+      "nodes_explored": 349,
+      "success_rate": 100.0
+    },
+    {
+      "test_name": "Hard",
+      "algorithm": "DFS",
+      "grid_size": 12,
+      "total_cells": 144,
+      "total_words": 11,
+      "total_chars": 78,
+      "found_words": 10,
+      "time_seconds": 0.0022542476654052734,
+      "memory_mb": 0.0,
+      "nodes_explored": 403,
+      "success_rate": 90.9090909090909
+    }
+  ]
+}
