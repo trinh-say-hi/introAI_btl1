@@ -28,6 +28,8 @@ class WordSearchGUI:
             'cell_searching': (255, 255, 150),
             'cell_found': (144, 238, 144),
             'cell_current': (255, 200, 100),
+            'cell_checking': (255, 180, 180),  # Màu đỏ nhạt khi check
+            'cell_failed': (255, 220, 220),    # Màu hồng nhạt khi fail
             'text': (40, 40, 60),
             'header': (60, 60, 120),
             'success': (34, 139, 34),
@@ -37,16 +39,22 @@ class WordSearchGUI:
             'button_hover': (70, 130, 220)
         }
         
-        # Kích thước
-        self.CELL_SIZE = min(50, 600 // self.size)
-        self.GRID_MARGIN = 20
-        self.SIDEBAR_WIDTH = 350
+        # Kích thước - scale cho laptop 14 inch (max ~900px)
+        if self.size <= 8:
+            self.CELL_SIZE = 50
+        elif self.size <= 10:
+            self.CELL_SIZE = 42
+        else:  # 12x12
+            self.CELL_SIZE = 38
+        
+        self.GRID_MARGIN = 15
+        self.SIDEBAR_WIDTH = 300
         
         grid_width = self.size * self.CELL_SIZE + 2 * self.GRID_MARGIN
         grid_height = self.size * self.CELL_SIZE + 2 * self.GRID_MARGIN
         
-        self.WINDOW_WIDTH = grid_width + self.SIDEBAR_WIDTH + 40
-        self.WINDOW_HEIGHT = max(grid_height + 100, 600)
+        self.WINDOW_WIDTH = grid_width + self.SIDEBAR_WIDTH + 30
+        self.WINDOW_HEIGHT = grid_height + 150
         
         # Tạo cửa sổ
         self.screen = pygame.display.set_mode((self.WINDOW_WIDTH, self.WINDOW_HEIGHT))
@@ -71,6 +79,8 @@ class WordSearchGUI:
         self.current_word = None
         self.current_path = []
         self.searching_positions = set()
+        self.checking_position = None  # Ô đang check
+        self.failed_positions = set()  # Các ô check thất bại
         self.animation_speed = 0.3
         self.is_running = True
         self.is_paused = False
@@ -135,7 +145,14 @@ class WordSearchGUI:
                 cell_color = self.COLORS['cell_normal']
                 border_width = 1
                 
-                if (i, j) in self.searching_positions:
+                # Ưu tiên: checking > failed > searching > current > found > normal
+                if self.checking_position and (i, j) == self.checking_position:
+                    cell_color = self.COLORS['cell_checking']
+                    border_width = 3
+                elif (i, j) in self.failed_positions:
+                    cell_color = self.COLORS['cell_failed']
+                    border_width = 2
+                elif (i, j) in self.searching_positions:
                     cell_color = self.COLORS['cell_searching']
                     border_width = 2
                 elif (i, j) in self.current_path:
@@ -229,11 +246,13 @@ class WordSearchGUI:
         self.screen.blit(stats_title, (sidebar_x + 20, y_offset))
         y_offset += 35
         
+        # Cập nhật thời gian theo thời gian thực
+        if self.start_time is not None:
+            self.elapsed_time = time.time() - self.start_time
+        
         stats = [
-            f"Found: {len(self.found_words)}/{len(self.grid.words)}",
-            f"Time: {self.elapsed_time:.2f}s",
-            f"Nodes: {self.nodes_explored}",
-            f"Speed: {int(self.animation_speed * 1000)}ms"
+            f"Found: {len(self.found_words)}/{len(self.grid.words)} words",
+            f"Time: {self.elapsed_time:.2f} seconds"
         ]
         
         for stat in stats:
@@ -283,7 +302,9 @@ class WordSearchGUI:
                 elif self.buttons['pause'].collidepoint(mouse_pos):
                     self.is_paused = not self.is_paused
                 elif self.buttons['next'].collidepoint(mouse_pos):
-                    self.is_paused = False
+                    # Auto pause if not paused yet, then step
+                    if not self.is_paused:
+                        self.is_paused = True
                     return 'next_step'
                 elif self.buttons['auto'].collidepoint(mouse_pos):
                     self.is_auto_play = not self.is_auto_play
@@ -292,6 +313,9 @@ class WordSearchGUI:
                 if event.key == pygame.K_SPACE:
                     self.is_paused = not self.is_paused
                 elif event.key == pygame.K_RIGHT:
+                    # Auto pause if not paused yet, then step
+                    if not self.is_paused:
+                        self.is_paused = True
                     return 'next_step'
                 elif event.key == pygame.K_a:
                     self.is_auto_play = not self.is_auto_play
@@ -315,36 +339,72 @@ class WordSearchGUI:
         current_row, current_col = row, col
         
         for i in range(1, len(word)):
-            # Update display
+            # Move to next cell
+            current_row += dr
+            current_col += dc
+            
+            # Kiểm tra vị trí có hợp lệ không
+            if not (0 <= current_row < self.size and 0 <= current_col < self.size):
+                # Hiển thị fail (out of bounds)
+                self.checking_position = None
+                self.render()
+                if not self.is_auto_play:
+                    pygame.time.wait(int(self.animation_speed * 500))
+                break
+            
+            # Hiệu ứng: Đang check ô này (màu đỏ nhạt)
             self.current_word = word
             self.current_path = path.copy()
-            self.searching_positions = {(current_row, current_col)}
+            self.checking_position = (current_row, current_col)
+            self.searching_positions = set()
             
             self.render()
             
+            # Wait for animation
             if not self.is_auto_play:
-                pygame.time.wait(int(self.animation_speed * 1000))
+                pygame.time.wait(int(self.animation_speed * 500))
             
             # Check events
             result = self.handle_events()
             if result == False:
                 return False
-            elif result == 'next_step':
-                pass
             
-            # Move to next cell
-            current_row += dr
-            current_col += dc
+            # Handle pause - wait until resume or next
+            while self.is_paused and result != 'next_step':
+                self.render()
+                result = self.handle_events()
+                if result == False:
+                    return False
+                pygame.time.wait(50)
             
-            if not (0 <= current_row < self.size and 0 <= current_col < self.size):
-                break
+            # If next_step, continue once then pause again
+            if result == 'next_step':
+                self.is_paused = True
             
+            # Kiểm tra ký tự có khớp không
             if self.grid.get_cell(current_row, current_col) != word[i]:
+                # KHÔNG KHỚP - Hiển thị fail (màu hồng nhạt)
+                self.failed_positions.add((current_row, current_col))
+                self.checking_position = None
+                self.render()
+                if not self.is_auto_play:
+                    pygame.time.wait(int(self.animation_speed * 500))
+                
+                # Xóa failed sau 1 chút
+                self.failed_positions.discard((current_row, current_col))
                 break
             
+            # KHỚP - Thêm vào path (màu cam)
             path.append((current_row, current_col))
             self.nodes_explored += 1
+            self.checking_position = None
+            self.current_path = path.copy()
+            
+            self.render()
+            if not self.is_auto_play:
+                pygame.time.wait(int(self.animation_speed * 300))
         
+        self.checking_position = None
         return path if len(path) == len(word) else None
     
     def solve_step_by_step(self):
@@ -440,9 +500,7 @@ class WordSearchGUI:
         # Kết quả
         results = [
             f"Found: {len(self.found_words)}/{len(self.grid.words)} words",
-            f"Time: {self.elapsed_time:.3f} seconds",
-            f"Nodes explored: {self.nodes_explored}",
-            f"Speed: {int(self.nodes_explored/self.elapsed_time) if self.elapsed_time > 0 else 0} nodes/s"
+            f"Time: {self.elapsed_time:.3f} seconds"
         ]
         
         for result in results:
