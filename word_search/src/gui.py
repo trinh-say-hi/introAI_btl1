@@ -37,6 +37,7 @@ class WordSearchGUI:
             "current": (255, 205, 110),
             "found": (160, 232, 160),
             "selected_word": (100, 170, 255),
+            "neighbor": (230, 230, 255),  # Xanh nhạt cho ô lân cận (DFS)
             "text": (40, 40, 60),
             "header": (60, 60, 120),
             "button": (100, 149, 237),
@@ -75,6 +76,7 @@ class WordSearchGUI:
         self.current_word = None
         self.current_path = []
         self.searching_positions = set()
+        self.neighbor_positions = set()  # DFS: ô lân cận đang xét
 
         self.problem_rects = []
         self.solver_rects = []
@@ -188,6 +190,7 @@ class WordSearchGUI:
         self.current_word = None
         self.current_path = []
         self.searching_positions = set()
+        self.neighbor_positions = set()
 
     def _sync_word_items(self):
         self.word_items = []
@@ -263,10 +266,21 @@ class WordSearchGUI:
 
                 for dir_idx in dir_ids:
                     direction = self.solver.directions[dir_idx]
+                    dr, dc = direction
+                    
+                    # DFS: Hiển thị ô lân cận theo hướng đang xét
+                    next_r = row + dr
+                    next_c = col + dc
+                    if hasattr(self.solver, 'get_neighbor_positions') and 0 <= next_r < self.size and 0 <= next_c < self.size:
+                        self.neighbor_positions = {(next_r, next_c)}
+                        yield "step"
+                    
+                    # Clear neighbor sau khi hiển thị
+                    self.neighbor_positions = set()
+                    
                     if not self._check_word_fits(word_u, row, col, direction):
                         continue
 
-                    dr, dc = direction
                     cur_r, cur_c = row, col
                     path = [(row, col)]
                     match = True
@@ -392,6 +406,10 @@ class WordSearchGUI:
                 if pos in selected_path:
                     color = self.colors["selected_word"]
                     border = 3
+                # DFS: Ô lân cận đang xét (màu xanh nhạt)
+                if pos in self.neighbor_positions:
+                    color = self.colors["neighbor"]
+                    border = 2
                 if pos in self.current_path:
                     color = self.colors["current"]
                     border = 3
