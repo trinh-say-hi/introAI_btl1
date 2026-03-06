@@ -1,6 +1,5 @@
 """
 Thuật toán A* (A-star) cho Word Search.
-Giữ interface tương thích với GUI hiện có (WordSearchHeuristics).
 """
 from dataclasses import dataclass
 import heapq
@@ -28,6 +27,7 @@ class WordSearchHeuristics:
     - find_word(word, verbose=False)
     - solve(verbose=False, step_by_step=False)
     - visualize_result()
+    Helper functions:
     - _sort_words_by_priority(), _get_promising_directions(), _check_word_fits()
     """
 
@@ -69,6 +69,8 @@ class WordSearchHeuristics:
                 ch = self.grid.get_cell(r, c)
                 positions.setdefault(ch, []).append((r, c))
         return positions
+
+        
 
     def _remaining_cost(self, word_len, index):
         """Heuristic h(n): số ký tự còn lại cần khớp."""
