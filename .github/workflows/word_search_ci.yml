@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    paths: word_search/** # Include all files in the word_search directory
+    # branches: [main, dev]
+  pull_request:
+    paths: word_search/** # Include all files in the word_search directory  
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # Thiết lập thư mục làm việc mặc định để không phải viết lại 'word_search/' nhiều lần
+    defaults:
+      run:
+        working-directory: ./word_search
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest ruff pytest-cov
+
+      - name: Lint (MVP scope)
+        run: |
+          ruff check UI/grid.py \
+            Algorithm/DFS.py \
+            Algorithm/A_star.py \
+            UI/solver_registry.py \
+            tests
+
+      - name: Compile check
+        run: |
+          python -m py_compile \
+            word_search/UI/grid.py \
+            Algorithm/DFS.py \
+            Algorithm/A_star.py \
+            UI/solver_registry.py
+
+      - name: Run tests
+        run: |
+          pytest --cov=Algorithm --cov=UI --cov-report=term-missing tests/

@@ -8,7 +8,7 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
-from gui import run_gui
+from UI.gui import run_gui
 
 def main():
     input_dir = os.path.join(os.path.dirname(__file__), "input")

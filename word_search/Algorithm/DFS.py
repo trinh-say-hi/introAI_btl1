@@ -20,7 +20,7 @@ class WordSearchDFS:
         # 8 hướng: phải, xuống, chéo phải xuống, chéo trái xuống,
         #          trái, lên, chéo trái lên, chéo phải lên
         self.directions = [
-            (0, -1),   # ngang phải
+            (0, 1),   # ngang phải
             (1, 0),   # dọc xuống
             (1, 1),   # chéo phải xuống
             (1, -1),  # chéo trái xuống

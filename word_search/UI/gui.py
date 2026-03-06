@@ -9,8 +9,8 @@ import os
 import time
 import pygame
 
-from grid import Grid
-from solver_registry import get_solver_options
+from UI.grid import Grid
+from UI.solver_registry import get_solver_options
 
 
 class WordSearchGUI:
