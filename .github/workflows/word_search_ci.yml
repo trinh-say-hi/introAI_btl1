@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     paths: word_search/** # Include all files in the word_search directory
-    # branches: [main, dev]
+    branches: [test_ci]
   pull_request:
     paths: word_search/** # Include all files in the word_search directory  
 
