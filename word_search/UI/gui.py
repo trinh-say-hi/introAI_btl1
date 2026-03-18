@@ -64,7 +64,7 @@ class WordSearchGUI:
         self.is_running = True
         self.state = "idle"  # idle / running / paused / completed
         self.step_iter = None
-        self.step_delay = 0.12
+        self.step_delay = 0.2
         self.last_step_ts = 0.0
         self.start_time = None
         self.elapsed_time = 0.0
@@ -217,6 +217,8 @@ class WordSearchGUI:
             return
         self._reset_solution_data()
         self._sync_word_items()
+        if hasattr(self.solver, "nodes_explored"):
+            self.solver.nodes_explored = 0
         self.state = "running"
         self.start_time = time.time()
         self.step_iter = self._step_generator()
@@ -251,88 +253,142 @@ class WordSearchGUI:
         for word in words:
             word_u = word.upper()
             self.current_word = word_u
-            found = False
+            if hasattr(self.solver, "iter_word_search"):
+                found = yield from self._step_word_with_solver_events(word_u)
+            else:
+                found = False
+                starts = self._get_start_positions(word_u)
 
-            starts = self._get_start_positions(word_u)
-
-            for row, col in starts:
-                if found:
-                    break
-                self.searching_positions = {(row, col)}
-                self.current_path = [(row, col)]
-                yield "step"
-
-                dir_ids = self._get_direction_candidates(word_u, row, col)
-
-                for dir_idx in dir_ids:
-                    direction = self.solver.directions[dir_idx]
-                    dr, dc = direction
-                    
-                    # DFS: Hiển thị ô lân cận theo hướng đang xét
-                    next_r = row + dr
-                    next_c = col + dc
-                    if hasattr(self.solver, 'get_neighbor_positions') and 0 <= next_r < self.size and 0 <= next_c < self.size:
-                        self.neighbor_positions = {(next_r, next_c)}
-                        yield "step"
-                    
-                    # Clear neighbor sau khi hiển thị
-                    self.neighbor_positions = set()
-                    
-                    if not self._check_word_fits(word_u, row, col, direction):
-                        continue
-
-                    cur_r, cur_c = row, col
-                    path = [(row, col)]
-                    match = True
-
-                    for i in range(1, len(word_u)):
-                        cur_r += dr
-                        cur_c += dc
-                        self.nodes_explored += 1
-
-                        if not (0 <= cur_r < self.size and 0 <= cur_c < self.size):
-                            match = False
-                            break
-                        if self.grid.get_cell(cur_r, cur_c) != word_u[i]:
-                            match = False
-                            break
-
-                        path.append((cur_r, cur_c))
-                        self.current_path = list(path)
-                        self.searching_positions = {(cur_r, cur_c)}
-                        yield "step"
-
-                    if match and len(path) == len(word_u):
-                        info = {
-                            "path": list(path),
-                            "start": path[0],
-                            "end": path[-1],
-                            "direction": self.solver.direction_names[dir_idx],
-                        }
-                        self.found_words[word_u] = info
-                        item = self._get_word_item(word_u)
-                        if item:
-                            item["found"] = True
-                            item["path"] = list(path)
-                            item["start"] = path[0]
-                            item["end"] = path[-1]
-                            item["direction"] = info["direction"]
-                        if self.selected_word is None:
-                            self.selected_word = word_u
-                        self.current_path = list(path)
-                        self.searching_positions = set()
-                        yield "step"
-                        found = True
+                for row, col in starts:
+                    if found:
                         break
+                    self.searching_positions = {(row, col)}
+                    self.current_path = [(row, col)]
+                    yield "step"
+
+                    dir_ids = self._get_direction_candidates(word_u, row, col)
+
+                    for dir_idx in dir_ids:
+                        direction = self.solver.directions[dir_idx]
+                        dr, dc = direction
+
+                        # DFS: Hiển thị ô lân cận theo hướng đang xét
+                        next_r = row + dr
+                        next_c = col + dc
+                        if hasattr(self.solver, "get_neighbor_positions") and 0 <= next_r < self.size and 0 <= next_c < self.size:
+                            self.neighbor_positions = {(next_r, next_c)}
+                            yield "step"
+
+                        # Clear neighbor sau khi hiển thị
+                        self.neighbor_positions = set()
+
+                        if not self._check_word_fits(word_u, row, col, direction):
+                            continue
+
+                        cur_r, cur_c = row, col
+                        path = [(row, col)]
+                        match = True
+
+                        for i in range(1, len(word_u)):
+                            cur_r += dr
+                            cur_c += dc
+                            self.nodes_explored += 1
+
+                            if not (0 <= cur_r < self.size and 0 <= cur_c < self.size):
+                                match = False
+                                break
+                            if self.grid.get_cell(cur_r, cur_c) != word_u[i]:
+                                match = False
+                                break
+
+                            path.append((cur_r, cur_c))
+                            self.current_path = list(path)
+                            self.searching_positions = {(cur_r, cur_c)}
+                            yield "step"
+
+                        if match and len(path) == len(word_u):
+                            info = {
+                                "path": list(path),
+                                "start": path[0],
+                                "end": path[-1],
+                                "direction": self.solver.direction_names[dir_idx],
+                            }
+                            self._apply_found_word(word_u, info)
+                            self.current_path = list(path)
+                            self.searching_positions = set()
+                            yield "step"
+                            found = True
+                            break
 
             self.current_path = []
             self.searching_positions = set()
+            self.neighbor_positions = set()
             yield "step"
 
         self.current_word = None
         self.current_path = []
         self.searching_positions = set()
+        self.neighbor_positions = set()
         yield "done"
+
+    def _apply_found_word(self, word_u, info):
+        self.found_words[word_u] = info
+        item = self._get_word_item(word_u)
+        if item:
+            item["found"] = True
+            item["path"] = list(info["path"])
+            item["start"] = info["start"]
+            item["end"] = info["end"]
+            item["direction"] = info["direction"]
+        if self.selected_word is None:
+            self.selected_word = word_u
+
+    def _step_word_with_solver_events(self, word_u):
+        for event in self.solver.iter_word_search(word_u):
+            event_type = event.get("type")
+            self.nodes_explored = event.get("nodes_explored", self.nodes_explored)
+
+            if event_type == "inspect_start":
+                pos = event.get("position")
+                self.current_path = [pos] if pos else []
+                self.searching_positions = {pos} if pos else set()
+                self.neighbor_positions = set()
+                yield "step"
+                continue
+
+            if event_type == "neighbor":
+                pos = event.get("position")
+                self.neighbor_positions = {pos} if pos else set()
+                yield "step"
+                self.neighbor_positions = set()
+                continue
+
+            if event_type in ("pop", "push"):
+                pos = event.get("position")
+                path = event.get("path", [])
+                self.current_path = list(path)
+                self.searching_positions = {pos} if pos else set()
+                yield "step"
+                continue
+
+            if event_type == "found":
+                result = event.get("result")
+                if not result:
+                    continue
+                info = {
+                    "path": list(result["path"]),
+                    "start": result["start"],
+                    "end": result["end"],
+                    "direction": result["direction"],
+                }
+                self._apply_found_word(word_u, info)
+                self.current_path = list(result["path"])
+                self.searching_positions = set()
+                self.neighbor_positions = set()
+                yield "step"
+                return True
+
+        return False
 
     def _get_ordered_words(self):
         words = self.grid.words

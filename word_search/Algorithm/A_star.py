@@ -191,31 +191,141 @@ class WordSearchHeuristics:
 
         return None, None
 
-    def find_word(self, word, verbose=False):
-        """Tìm 1 từ bằng A* + pruning."""
+    def _reconstruct_path(self, came_from, state):
+        """Khôi phục path từ state cuối cùng."""
+        path = []
+        while state is not None:
+            r, c, _, _ = state
+            path.append((r, c))
+            state = came_from[state]
+        path.reverse()
+        return path
+
+    def iter_word_search(self, word):
+        """
+        Stream từng bước tìm 1 từ theo đúng thứ tự ưu tiên trong heap.
+
+        Event format:
+        - inspect_start: {"type": "inspect_start", "position": (r, c)}
+        - pop: {"type": "pop", "position": (r, c), "path": [...], "nodes_explored": n}
+        - neighbor: {"type": "neighbor", "position": (r, c)}
+        - push: {"type": "push", "position": (r, c), "path": [...], "nodes_explored": n}
+        - found: {"type": "found", "result": {...}, "nodes_explored": n}
+        - not_found: {"type": "not_found", "nodes_explored": n}
+        """
         word = word.upper()
         if not word:
-            return None
+            yield {"type": "not_found", "nodes_explored": self.nodes_explored}
+            return
 
         first_char = word[0]
         start_positions = self.char_positions.get(first_char, [])
         if not start_positions:
-            return None
+            yield {"type": "not_found", "nodes_explored": self.nodes_explored}
+            return
 
-        for row, col in start_positions:
-            direction_candidates = self._get_promising_directions(word, row, col)
+        goal_index = len(word)
+
+        for start_row, start_col in start_positions:
+            direction_candidates = self._get_promising_directions(word, start_row, start_col)
+            yield {"type": "inspect_start", "position": (start_row, start_col), "nodes_explored": self.nodes_explored}
             if not direction_candidates:
                 continue
 
-            path, direction_idx = self._a_star_from_start(word, row, col, direction_candidates)
-            if path:
-                return {
-                    "word": word,
-                    "start": path[0],
-                    "end": path[-1],
-                    "direction": self.direction_names[direction_idx],
-                    "path": path,
+            open_heap = []
+            came_from = {}
+            best_g = {}
+
+            for dir_idx in direction_candidates:
+                start_node = _AStarNode(
+                    f_cost=self._remaining_cost(len(word), 1),
+                    g_cost=1,
+                    row=start_row,
+                    col=start_col,
+                    index=1,
+                    direction_idx=dir_idx,
+                )
+                state = (start_row, start_col, 1, dir_idx)
+                best_g[state] = 1
+                came_from[state] = None
+                heapq.heappush(open_heap, start_node)
+
+            while open_heap:
+                current = heapq.heappop(open_heap)
+                self.nodes_explored += 1
+
+                current_state = (current.row, current.col, current.index, current.direction_idx)
+                current_path = self._reconstruct_path(came_from, current_state)
+                yield {
+                    "type": "pop",
+                    "position": (current.row, current.col),
+                    "path": current_path,
+                    "direction_idx": current.direction_idx,
+                    "nodes_explored": self.nodes_explored,
                 }
+
+                if current.index == goal_index:
+                    result = {
+                        "word": word,
+                        "start": current_path[0],
+                        "end": current_path[-1],
+                        "direction": self.direction_names[current.direction_idx],
+                        "path": current_path,
+                    }
+                    yield {"type": "found", "result": result, "nodes_explored": self.nodes_explored}
+                    return
+
+                dr, dc = self.directions[current.direction_idx]
+                nr = current.row + dr
+                nc = current.col + dc
+                next_index = current.index + 1
+
+                if 0 <= nr < self.size and 0 <= nc < self.size:
+                    yield {"type": "neighbor", "position": (nr, nc), "nodes_explored": self.nodes_explored}
+                else:
+                    continue
+
+                if word[current.index] != self.grid.get_cell(nr, nc):
+                    continue
+
+                next_state = (nr, nc, next_index, current.direction_idx)
+                tentative_g = current.g_cost + 1
+                old_g = best_g.get(next_state)
+                if old_g is not None and tentative_g >= old_g:
+                    continue
+
+                best_g[next_state] = tentative_g
+                came_from[next_state] = current_state
+                h = self._remaining_cost(len(word), next_index)
+                heapq.heappush(
+                    open_heap,
+                    _AStarNode(
+                        f_cost=tentative_g + h,
+                        g_cost=tentative_g,
+                        row=nr,
+                        col=nc,
+                        index=next_index,
+                        direction_idx=current.direction_idx,
+                    ),
+                )
+                next_path = self._reconstruct_path(came_from, next_state)
+                yield {
+                    "type": "push",
+                    "position": (nr, nc),
+                    "path": next_path,
+                    "direction_idx": current.direction_idx,
+                    "nodes_explored": self.nodes_explored,
+                }
+
+        yield {"type": "not_found", "nodes_explored": self.nodes_explored}
+
+    def find_word(self, word, verbose=False):
+        """Tìm 1 từ bằng A* + pruning."""
+        del verbose  # giữ interface tương thích
+        word = word.upper()
+        for event in self.iter_word_search(word):
+            if event["type"] == "found":
+                return event["result"]
         return None
 
     def solve(self, verbose=False, step_by_step=False):

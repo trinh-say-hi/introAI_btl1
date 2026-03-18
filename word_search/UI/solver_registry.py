@@ -12,11 +12,13 @@ Format chung để thêm solver mới:
 """
 from Algorithm.DFS import WordSearchDFS
 from Algorithm.A_star import WordSearchHeuristics
+from Algorithm.Greedy_BFF import WordSearchGreedyBestFirst
 
 
 SOLVER_REGISTRY = [
     ("DFS", WordSearchDFS),
     ("A_STAR", WordSearchHeuristics),
+    ("GREEDY_BFF", WordSearchGreedyBestFirst),
 ]
 
 
