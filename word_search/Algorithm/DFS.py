@@ -24,7 +24,7 @@ class WordSearchDFS:
             (1, 0),   # dọc xuống
             (1, 1),   # chéo phải xuống
             (1, -1),  # chéo trái xuống
-            (0, -1),  # ngang trái
+            (0, 1),  # ngang trái
             (-1, 0),  # dọc lên
             (-1, -1), # chéo trái lên
             (-1, 1)   # chéo phải lên
@@ -68,6 +68,20 @@ class WordSearchDFS:
         
         new_path = path + [(new_row, new_col)]
         return self.dfs_search_word(word, new_row, new_col, direction, index + 1, new_path)
+    
+    def get_neighbor_positions(self, row, col):
+        """
+        Lấy 8 ô lân cận của vị trí (row, col) để visualize
+        Returns:
+            list các vị trí (row, col) hợp lệ
+        """
+        neighbors = []
+        for dr, dc in self.directions:
+            new_row = row + dr
+            new_col = col + dc
+            if self.is_valid(new_row, new_col):
+                neighbors.append((new_row, new_col))
+        return neighbors
     
     def find_word(self, word, verbose=False):
         """

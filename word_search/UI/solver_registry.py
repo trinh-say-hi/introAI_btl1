@@ -10,13 +10,15 @@ Format chung để thêm solver mới:
    - `_get_promising_directions(word, row, col)`
    - `_check_word_fits(word, row, col, direction)`
 """
-from word_search_dfs import WordSearchDFS
-from word_search_heuristics import WordSearchHeuristics
+from Algorithm.DFS import WordSearchDFS
+from Algorithm.A_star import WordSearchHeuristics
+from Algorithm.Greedy_BFF import WordSearchGreedyBestFirst
 
 
 SOLVER_REGISTRY = [
     ("DFS", WordSearchDFS),
     ("A_STAR", WordSearchHeuristics),
+    ("GREEDY_BFF", WordSearchGreedyBestFirst),
 ]
 
 
