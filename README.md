@@ -50,7 +50,7 @@ Giải bài toán Sudoku mở rộng với ràng buộc tổng (cage).
 ### ⚙️ Thuật toán sử dụng
 
 * DFS (Backtracking)
-* A* + Heuristic
+* A* + RMV
 
 ---
 
